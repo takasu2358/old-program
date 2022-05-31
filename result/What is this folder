@@ -1,0 +1,6 @@
+#What is this
+Csv file obtained from no-obj.ply is saved here as named flat.csv.
+Depth image converted from out.ply is saved here as named depthimg.png.
+Grasp position image is saved here as named grasp_position.png
+Other result file is saved at Experiment folder as named Experiment-{date}.
+
