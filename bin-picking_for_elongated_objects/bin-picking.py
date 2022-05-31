@@ -3169,6 +3169,6 @@ if __name__ == "__main__":
     make_motionfile(optimal_grasp, goal_position)
     print("Making motion file is succeeded! : file name is motionfile.dat and motionfile_csv.csv")
     ################################################################################################
-
+    print("test")
     elapsed_time = time.time() - start#処理の終了時間を取得
     print("実行時間は{}秒でした．".format(elapsed_time))
