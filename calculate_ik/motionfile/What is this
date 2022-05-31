@@ -1,7 +1,0 @@
-#What is this
-Motionfile created at bin-picking.py is saved here.
-posrot2ik.py calculates ik and makes this motionfile_csv.csv motionfile_ik.dat. 
-
-#How to use
-$python3 ./calculate_ik/posrot2ik.py
-

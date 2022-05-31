@@ -5,12 +5,12 @@ import pandas as pd
 import cv2
 import time
 from PIL import Image
+import sys
+sys.dont_write_bytecode = True
 
 num = 3
 WINDOW_WIDTH = 420
 WINDOW_HEIGHT = 330
-MAX_DEPTH = 100
-MIN_DEPTH = 0
 left = -100
 right = 320
 up = 160
@@ -33,6 +33,11 @@ def pointcloud_process(pcd_matrix, flat):
     return depth
 
 def PtoD(depth):
+    MAX_DEPTH = depth.max()
+    if MAX_DEPTH > 100:
+        MAX_DEPTH = 100
+    MIN_DEPTH = 0
+
     for i, row in enumerate(depth):
         for j, z in enumerate(row):
             if z <= MAX_DEPTH:
@@ -91,7 +96,7 @@ if __name__ == "__main__":
     start = time.time()
 
     # filepath = "./ply/current_used/u-cylinder1.ply"
-    filepath = "./ply/out1.ply"
+    filepath = "/home/takasu/ダウンロード/wire-test/ply/out1.ply"
     
     # ptCloud = o3d.io.read_point_cloud(filepath)
     # o3d.visualization.draw_geometries([ptCloud])
@@ -99,8 +104,8 @@ if __name__ == "__main__":
     depth = main(filepath)
 
     df  = pd.DataFrame(depth)
-    df.to_csv('./result/depth_result.csv')
-    cv2.imwrite('./result/depthimg.png', depth)
+    # df.to_csv('./result/depth_result.csv')
+    # cv2.imwrite('./result/depthimg.png', depth)
 
     elapsed_time = time.time() - start#処理の終了時間を取得
     print("実行時間は{}秒でした．".format(elapsed_time))

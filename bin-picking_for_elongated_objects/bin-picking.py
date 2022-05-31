@@ -23,6 +23,7 @@ from datetime import datetime as dt
 import os
 warnings.simplefilter('ignore')
 sys.setrecursionlimit(10000)
+sys.dont_write_bytecode = True
 tdatetime = dt.now()
 tstr = tdatetime.strftime("%Y-%m-%d-%H-%M-%S")
 foldername = "trash/" + "Experiment-" + tstr
@@ -91,6 +92,13 @@ def line_circle_delete(line_img):
     line_img = skeletonize(line_img, method="lee") #再度細線化
 
     return line_img
+
+def min_max_x(x):
+    x = np.array(x)
+    max_x = x.max(keepdims=True)
+    min_x = x.min(keepdims=True)
+    min_max_x = (x - min_x) / (max_x - min_x)
+    return min_max_x
 
 class Visualize():
     
@@ -199,7 +207,6 @@ class SaveImage():
         depth[depth < 1] *= 255
         cv2.imwrite('/home/takasu/ダウンロード/wire-test/result/grasp_position.png'.format(foldername), depth)
         cv2.imwrite('/home/takasu/ダウンロード/wire-test/result/Experiment/{}/grasp_position.png'.format(foldername), depth)
-        # cv2.imwrite('/home/takasu/ダウンロード/wire-test/result/grasp_image/{}.png'.format(filename)), depth)
 
 class MakeImage():
 
@@ -1973,7 +1980,7 @@ class ConnectLine():
 
         if not count_list == []:
             LC_skel_list, z_list, end_point_list, interpolate, correct_connection_index2 = CL.connect_line(sorted_skel_list, end_point_list, count_list, switch_list, dis_data, [], [])
-            LC_region_list = region_img_index1(correct_connection_index, correct_connection_index2, skel_skip_index, skip_index)
+            LC_region_list = self.region_img_index1(correct_connection_index, correct_connection_index2, skel_skip_index, skip_index)
             LC_skel_list.extend(correct_line)
             z_list.extend(correct_line_zlist)
             interpolate.extend(interpolate_line)
@@ -1981,7 +1988,7 @@ class ConnectLine():
             LC_skel_list = []
             LC_skel_list.extend(sorted_skel_list)
             LC_skel_list.extend(correct_line)
-            LC_region_list = region_img_index2(correct_connection_index, len(sorted_skel_list), skel_skip_index, skip_index)
+            LC_region_list = self.region_img_index2(correct_connection_index, len(sorted_skel_list), skel_skip_index, skip_index)
 
             depth = img_copy.copy()
             depth = cv2.morphologyEx(depth, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
@@ -2534,54 +2541,54 @@ class ConnectLine():
 
         return end_point_list
 
-def insert2list(target_list, insert_index):
-    for x in insert_index:
-        for i, li in enumerate(target_list):
+    def insert2list(awlf, target_list, insert_index):
+        for x in insert_index:
+            for i, li in enumerate(target_list):
+                if type(li) is list:
+                    for j, y in enumerate(li):
+                        if y >= x:
+                            target_list[i][j] += 1
+                else:
+                    if li >= x:
+                        target_list[i] += 1
+        return target_list
+
+    def make_1and2DimentionalList2flat(self, target_list):
+        flat = []
+        for li in target_list:
             if type(li) is list:
-                for j, y in enumerate(li):
-                    if y >= x:
-                        target_list[i][j] += 1
+                for x in li:
+                    flat.append(x)
             else:
-                if li >= x:
-                    target_list[i] += 1
-    return target_list
+                flat.append(li)
+        return flat
 
-def make_1and2DimentionalList2flat(target_list):
-    flat = []
-    for li in target_list:
-        if type(li) is list:
-            for x in li:
-                flat.append(x)
-        else:
-            flat.append(li)
-    return flat
+    def region_img_index1(self, index_list1, index_list2, skel_skip_index, skip_index):
+        skel_skip_index.sort()
+        skip_index.sort()
+        index_list2 = self.insert2list(index_list2, skel_skip_index)
+        index_list1 = self.insert2list(index_list1, skip_index)
+        flat_index1 = self.make_1and2DimentionalList2flat(index_list1)
+        flat_index1.sort()
+        index_list2 = self.insert2list(index_list2, flat_index1)
+        index_list2.extend(index_list1)
 
-def region_img_index1(index_list1, index_list2, skel_skip_index, skip_index):
-    skel_skip_index.sort()
-    skip_index.sort()
-    index_list2 = insert2list(index_list2, skel_skip_index)
-    index_list1 = insert2list(index_list1, skip_index)
-    flat_index1 = make_1and2DimentionalList2flat(index_list1)
-    flat_index1.sort()
-    index_list2 = insert2list(index_list2, flat_index1)
-    index_list2.extend(index_list1)
+        return index_list2
 
-    return index_list2
+    def region_img_index2(self, index_list1, len_skel_list, skel_skip_index, skip_index):
+        index_list2 = []
+        for i in range(len_skel_list):
+            index_list2.append(i)
+        skel_skip_index.sort()
+        skip_index.sort()
+        index_list2 = self.insert2list(index_list2, skel_skip_index)
+        index_list1 = self.insert2list(index_list1, skip_index)
+        flat_index1 = self.make_1and2DimentionalList2flat(index_list1)
+        flat_index1.sort()
+        index_list2 = self.insert2list(index_list2, flat_index1)
+        index_list2.extend(index_list1)
 
-def region_img_index2(index_list1, len_skel_list, skel_skip_index, skip_index):
-    index_list2 = []
-    for i in range(len_skel_list):
-        index_list2.append(i)
-    skel_skip_index.sort()
-    skip_index.sort()
-    index_list2 = insert2list(index_list2, skel_skip_index)
-    index_list1 = insert2list(index_list1, skip_index)
-    flat_index1 = make_1and2DimentionalList2flat(index_list1)
-    flat_index1.sort()
-    index_list2 = insert2list(index_list2, flat_index1)
-    index_list2.extend(index_list1)
-
-    return index_list2
+        return index_list2
 
 class GaussLinkingIintegral():
 
@@ -2777,13 +2784,6 @@ class GaussLinkingIintegral():
 
         return top_5_index, top_5_max_GLI_index, objs_GLI
 
-def min_max_x(x):
-    x = np.array(x)
-    max_x = x.max(keepdims=True)
-    min_x = x.min(keepdims=True)
-    min_max_x = (x - min_x) / (max_x - min_x)
-    return min_max_x
-
 class Graspability():
 
     def __init__(self):
@@ -2912,6 +2912,7 @@ class Graspability():
             finish_index -= (self.interval + 1)
         #################################################################################################
 
+        ####################把持対象物の画像の作成###############################################################
         if type(grasp_region_index) is list:
             contact_image = np.zeros((height, width))
             for rind in grasp_region_index:
@@ -2919,27 +2920,31 @@ class Graspability():
                 contact_image += rimg
         else:
             contact_image = MI.make_image(region_list[grasp_region_index], 1)
+        ################################################################################################
 
-        if not type(grasp_region_index) is list:
-            grasp_region_index = [grasp_region_index]
+        # if not type(grasp_region_index) is list:
+        #     grasp_region_index = [grasp_region_index]
 
         depth = img_copy.copy()
         depth[all_region==0] *= 0
-        depth[contact_image>0] = 0
-        contact_depth = depth * contact_image
-        # V.visualize_2img(contact_image, depth)
+        contact_depth = depth.copy()
+        # contact_depth = depth * contact_image    #把持対象物のみの深度画像
+        depth[contact_image>0] = 0               #把持対象物の無い深度画像
 
-        for i in range(start_index, finish_index - 1, self.interval):
+        ########################対象物に沿って一定間隔で把持位置を求める####################################
+        if start_index == 0:
+            start_index += self.interval
+        prev_poi = [-1, -1]
+        for i in range(start_index, finish_index - self.interval, self.interval):
             poi = grasp_obj[i]
             if poi in obj_interpolate:
                 continue
-            try:
-                next_poi = grasp_obj[i+self.interval]
-            except IndexError:
-                next_poi = grasp_obj[length-1]
+            next_poi = grasp_obj[i+self.interval]
             z = contact_depth[poi[0]][poi[1]]+30
-            optimal_grasp = self.graspability(poi, next_poi, optimal_grasp, Hc_original_list, depth, z, i//self.interval)
+            optimal_grasp = self.graspability(poi, next_poi, prev_poi, optimal_grasp, Hc_original_list, depth, z, i//self.interval)
+            prev_poi = poi
             # depth = cv2.circle(depth, (poi[1], poi[0]), 1, (255, 0, 0), -1)
+        ####################################################################################################
 
         ##############################################################################
         # vec = np.array(next_poi) - np.array(poi)
@@ -2988,18 +2993,20 @@ class Graspability():
         depth[contact_image>0] = 0
         contact_depth = depth * contact_image
 
+        prev_poi = [-1, -1]
         for i in range(overlapped_point_index - self.interval*2, overlapped_point_index + self.interval*2 + 1, self.interval):
             if i < 0 or i + self.interval >= len(grasp_obj):
                 continue
             poi = grasp_obj[i]
             next_poi = grasp_obj[i+self.interval]
             z = contact_depth[poi[0]][poi[1]]+30
-            optimal_grasp = self.graspability(poi, next_poi, optimal_grasp, Hc_original_list, depth, z, i//self.interval)
+            optimal_grasp = self.graspability(poi, next_poi, prev_poi, optimal_grasp, Hc_original_list, depth, z, i//self.interval)
+            prev_poi = poi
             # depth = cv2.circle(depth, (poi[1], poi[0]), 1, (255, 0, 0), -1)
 
         return optimal_grasp
 
-    def graspability(self, poi, next_poi, optimal_grasp, Hc_original_list, depth, z, index):
+    def graspability(self, poi, next_poi, prev_poi, optimal_grasp, Hc_original_list, depth, z, index):
         if z == 0:
             raise ValueError("2945行目、把持点が不適当です。")        
 
@@ -3008,6 +3015,9 @@ class Graspability():
 
         Hc_rotate_list = []
         vector2next = np.array([next_poi[0], next_poi[1]]) - np.array([poi[0], poi[1]])
+        if prev_poi[0] > 0:
+            vector2prev = np.array([poi[0], poi[1]]) - np.array([prev_poi[0], prev_poi[1]])
+            vector2next = (vector2next + vector2prev) // 2
         for Hc_original in Hc_original_list:
             Hc_original = self.cv2pil(Hc_original)
             initial_rotate = math.degrees(math.atan2(vector2next[1], vector2next[0]))
@@ -3078,7 +3088,7 @@ def make_motionfile(optimal_grasp, goal_potion):
     motion_list.append([time, time+time_interval, "LARM_XYZ_ABS", goal_x, goal_y, upper_z, 0, 0, 0]) #ハンドを上げる
     time += time_interval
 
-    with open("/home/takasu/ダウンロード/calculate_ik/motionfile/motionfile.dat", "w") as f:
+    with open("/home/takasu/ダウンロード/wire-test/motionfile/motionfile.dat", "w") as f:
         for motion in motion_list:
             length = len(motion)
             for i in range(length):
@@ -3089,7 +3099,7 @@ def make_motionfile(optimal_grasp, goal_potion):
                     f.write("\n")
     f.close()
 
-    with open("/home/takasu/ダウンロード/calculate_ik/motionfile/motionfile_csv.csv", "w") as f:
+    with open("/home/takasu/ダウンロード/wire-test/motionfile/motionfile_csv.csv", "w") as f:
         writer = csv.writer(f)
         for motion in motion_list:
             writer.writerow(motion)
@@ -3159,8 +3169,6 @@ if __name__ == "__main__":
     make_motionfile(optimal_grasp, goal_position)
     print("Making motion file is succeeded! : file name is motionfile.dat and motionfile_csv.csv")
     ################################################################################################
-
-    print("test")
 
     elapsed_time = time.time() - start#処理の終了時間を取得
     print("実行時間は{}秒でした．".format(elapsed_time))

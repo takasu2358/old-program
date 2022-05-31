@@ -129,7 +129,7 @@ def read_file(filepath):
     return motion_seq_list
 
 def write_file(motion_seq_list):
-    with open("/home/takasu/ダウンロード/u_cylinder/motionfile/motionfile_ik.dat", "w") as f:
+    with open("/home/takasu/ダウンロード/wire-test/motionfile/motionfile_ik.dat", "w") as f:
         for motion in motion_seq_list:
             length = len(motion)
             for i in range(length):
@@ -143,6 +143,6 @@ def write_file(motion_seq_list):
     print("Making IK Motionfile is succeeded! : file name is motionfile_ik.dat")
 
 if __name__ == "__main__":
-    filepath = "/home/takasu/ダウンロード/u_cylinder/motionfile/motionfile_csv.csv"
+    filepath = "/home/takasu/ダウンロード/wire-test/motionfile/motionfile_csv.csv"
     motion_seq_list = read_file(filepath)
     write_file(motion_seq_list)
