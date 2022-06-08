@@ -91,12 +91,12 @@ if __name__ == "__main__":
     # filepath = "./ply/current_used/u-cylinder1.ply"
     # filepath = "./ply/motion_test/test1.ply"
     # filepath = "./ply/flat.ply"
-    filepath = "./ply/no-obj.ply"
+    filepath = "/home/takasu/ダウンロード/wire-test/ply/no-obj.ply"
 
     depth = main(filepath)
 
     df  = pd.DataFrame(depth)
-    df.to_csv('./result/flat.csv', header=False, index=False)
+    df.to_csv('/home/takasu/ダウンロード/wire-test/result/flat.csv', header=False, index=False)
     cv2.imwrite('./result/flat.png', depth)
 
     elapsed_time = time.time() - start#処理の終了時間を取得

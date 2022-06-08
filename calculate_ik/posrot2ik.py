@@ -67,7 +67,9 @@ def calculate_ik(line):
     
     nxtrobot = NxtRobot()
     armjntsgoal6 = nxtik.numik(nxtrobot, pos, rot, armid="lft")
-    print(pos, rot, armjntsgoal6)
+    # print(pos, rot)
+    # print(armjntsgoal6)
+    # print("")
 
     if not isinstance(armjntsgoal6, np.ndarray):
         raise ValueError("Arm joints is None!")
@@ -121,10 +123,10 @@ def read_file(filepath):
 
     f.close()
 
-    for motion_seq in motion_seq_list:
-        print(motion_seq)
+    # for motion_seq in motion_seq_list:
+    #     print(motion_seq)
 
-    print("IK is solved ans motion sequence is constructed!")
+    print("IK is solved and motion sequence is constructed!")
 
     return motion_seq_list
 

@@ -26,7 +26,7 @@ sys.setrecursionlimit(10000)
 sys.dont_write_bytecode = True
 tdatetime = dt.now()
 tstr = tdatetime.strftime("%Y-%m-%d-%H-%M-%S")
-foldername = "trash/" + "Experiment-" + tstr
+foldername = "Experiment-" + tstr
 os.mkdir("/home/takasu/ダウンロード/wire-test/result/Experiment/{}".format(foldername))
 args = sys.argv
 full_length = int(args[1])
@@ -41,8 +41,8 @@ blocksize = 25              #valley_enhance関数内
 line_length_threshold = 40  #valley_enhance関数内
 cut_threshold = 50          #cutting, ad_cutting関数内 
 
-filepath = "/home/takasu/ダウンロード/wire-test/ply/out1.ply"
-img = ply2depth_csv.main(filepath)
+filepath = "/home/takasu/ダウンロード/wire-test/ply/out.ply"
+img, matrix_image, pcd_matrix = ply2depth_csv.main(filepath)
 cv2.imwrite('/home/takasu/ダウンロード/wire-test/result/Experiment/{}/depthimg.png'.format(foldername), img)
 height, width = img.shape #画像サイズの取得
 img_copy = img.copy() #画像のコピー
@@ -2819,6 +2819,7 @@ class Graspability():
 
             count_iterations = 0
             warn_area = 30
+            optimal_grasp2 = []
             for obj_index, max_GLI_index in zip(top_5_index, top_5_max_GLI_index):
                 optimal_grasp = self.find_grasp_point(LC_skel_list, obj_index, interpolate, cross_matrix, region_list2, LC_region_list, all_region)
                 if optimal_grasp == []:
@@ -3045,6 +3046,23 @@ class Graspability():
         
         return optimal_grasp
 
+def transform_camera_to_robot(camera_loc, calib_path):
+    """
+    Transform camera loc to robot loc
+    Use 4x4 calibration matrix
+    Parameters:
+        camera_loc {tuple} -- (cx,cy,cy) at camera coordinate
+        calib_path {str} -- calibration matrix file path
+    Returns: 
+        robot_loc {tuple} -- (rx,ry,rz) at robot coordinate
+    """
+    # get calibration matrix 4x4
+    (cx, cy, cz) = camera_loc
+    calibmat = np.loadtxt(calib_path)
+    camera_pos = np.array([cx, cy, cz, 1])
+    rx, ry, rz, _ = np.dot(calibmat, camera_pos)  # unit: mm --> m
+    return (rx, ry, rz)
+
 def make_motionfile(optimal_grasp, goal_potion):
     #motion = [start, end, option, x, y, z, roll, pitch, yaw]
     #optimal_grasp = [graspability, orientation, z, [x, y]]
@@ -3052,15 +3070,36 @@ def make_motionfile(optimal_grasp, goal_potion):
     time, time_interval = 0, 3
 
     best_grasp = optimal_grasp[0]
-    obj_x = 0.25 + best_grasp[3][0]/330*0.37 + 0.02
-    obj_y = -0.18 + (best_grasp[3][1]-70)/420*0.47 - 0.02 + (height - best_grasp[3][1])*0.00007
+    x = best_grasp[3][1]
+    y = best_grasp[3][0]
 
-    obj_z = -((1200-best_grasp[2]*40/255)*1118/1200-(1118-115))/1000 + 0.115
-    print("best_z = ", best_grasp[2] )
-    print("obj_z = ", obj_z)
+    index = int(matrix_image[y][x])
+    camera_loc = pcd_matrix[index]/1000
+    calib_path = "/home/takasu/ダウンロード/wire-test/calibmat.txt"
+    grasp_point = transform_camera_to_robot(camera_loc, calib_path)
+    obj_x = grasp_point[0]
+    obj_y = grasp_point[1]
+    obj_z = grasp_point[2]-0.13
+    print("grasp_point = ", grasp_point)
+
+    # print(best_grasp)
+    # obj_x = 0.33 + best_grasp[3][0]/330*0.37
+    # obj_y = -0.18 + (best_grasp[3][1]-70)/420*0.47 - 0.02 + (height - best_grasp[3][1])*0.00007
+
+    # obj_x = 0.34 + best_grasp[3][0]/330*0.34
+    # obj_y = -0.17 + best_grasp[3][1]/420*0.47
+    # obj_z = -((1200-best_grasp[2]*40/255)*1118/1200-(1118-115))/1000 + 0.12
+
+    # print("best_z = ", best_grasp[2] )
+    # print("obj_z = ", obj_z)
         
     obj_orientation = best_grasp[1]
+    if obj_orientation > 90:
+        obj_orientation -= 180
+    elif obj_orientation < -90:
+        obj_orientation += 180 
     obj_roll, obj_pitch, obj_yaw = 0, 0, round(obj_orientation, 1)
+    print("grasp_orientation = ", (obj_roll, obj_pitch, obj_yaw))
 
     goal_x = goal_potion[0]
     goal_y = goal_potion[1]
@@ -3158,17 +3197,17 @@ if __name__ == "__main__":
     ###############################把持位置の取得###################################################
     GA = Graspability()
     optimal_grasp, optimal_grasp2, obj_index = GA.__main__(objs_GLI, LC_skel_list, LC_region_list, interpolate, GLI_matrix, z_list, region_list2)
-    print("optimal_grasp = {}".format(optimal_grasp))
+    # print("optimal_grasp = {}".format(optimal_grasp))
     # print("opitmal_grasp2 = {}".format(optimal_grasp2))
     SI.save_grasp_position(LC_skel_list, obj_index, optimal_grasp)
     print("Decision of grasp position is succeeded!")
     ################################################################################################
 
     ##############################モーションファイルの作成##########################################
-    goal_position = [0.4, 0.33, 0]
+    goal_position = [0.4, 0.38, 0]
     make_motionfile(optimal_grasp, goal_position)
     print("Making motion file is succeeded! : file name is motionfile.dat and motionfile_csv.csv")
     ################################################################################################
-    print("test")
+
     elapsed_time = time.time() - start#処理の終了時間を取得
     print("実行時間は{}秒でした．".format(elapsed_time))
