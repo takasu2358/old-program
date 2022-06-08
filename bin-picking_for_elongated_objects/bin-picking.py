@@ -1,6 +1,6 @@
 import enum
 from multiprocessing.sharedctypes import Value
-from cv2 import circle, normalize
+from cv2 import circle, grabCut, normalize
 from matplotlib import markers
 import numpy as np
 import cv2
@@ -2820,6 +2820,7 @@ class Graspability():
             count_iterations = 0
             warn_area = 30
             optimal_grasp2 = []
+
             for obj_index, max_GLI_index in zip(top_5_index, top_5_max_GLI_index):
                 optimal_grasp = self.find_grasp_point(LC_skel_list, obj_index, interpolate, cross_matrix, region_list2, LC_region_list, all_region)
                 if optimal_grasp == []:
@@ -2936,13 +2937,26 @@ class Graspability():
         if start_index == 0:
             start_index += self.interval
         prev_poi = [-1, -1]
+        
+        unique = list(map(list, set(map(tuple, grasp_obj))))
+        if not len(unique) == len(grasp_obj):
+            print("2943行目　把持対象物の細線座標に重複があります。")
+            print("len(unique) = {}, len(grasp_obj) = {}".format(len(unique), len(grasp_obj)))
+
         for i in range(start_index, finish_index - self.interval, self.interval):
             poi = grasp_obj[i]
             if poi in obj_interpolate:
                 continue
             next_poi = grasp_obj[i+self.interval]
-            z = contact_depth[poi[0]][poi[1]]+30
+            z = contact_depth[poi[0]][poi[1]]
             optimal_grasp = self.graspability(poi, next_poi, prev_poi, optimal_grasp, Hc_original_list, depth, z, i//self.interval)
+
+            # _, Wc = cv2.threshold(depth,z,255,cv2.THRESH_BINARY)
+            # contact_image2 = gray2color(contact_image)
+            # contact_image2[poi[0]-1:poi[0]+1, poi[1]-1:poi[1]+1] = [255, 0, 0]
+            # print(z)
+            # V.visualize_3img(img_copy, contact_image2, Wc)
+
             prev_poi = poi
             # depth = cv2.circle(depth, (poi[1], poi[0]), 1, (255, 0, 0), -1)
         ####################################################################################################
@@ -3009,7 +3023,10 @@ class Graspability():
 
     def graspability(self, poi, next_poi, prev_poi, optimal_grasp, Hc_original_list, depth, z, index):
         if z == 0:
-            raise ValueError("2945行目、把持点が不適当です。")        
+            raise ValueError("3028行目、把持点が不適当です。")        
+        z -= 30
+        if z < 0:
+            z = 0
 
         depth = min_max_x(depth)
         depth *= 255
@@ -3025,7 +3042,7 @@ class Graspability():
             Hc_rotate_list.append(Hc_original.rotate(initial_rotate))
 
         num_template = len(Hc_rotate_list)
-        _, Wc = cv2.threshold(depth,z-30,255,cv2.THRESH_BINARY)
+        _, Wc = cv2.threshold(depth,z,255,cv2.THRESH_BINARY)
         Wc = self.cv2pil(Wc)
         Wc = Wc.crop((poi[1]-self.cutsize, poi[0]-self.cutsize, poi[1]+self.cutsize, poi[0]+self.cutsize))
         for angle in np.arange(-22.5, 33.75, 22.5):
