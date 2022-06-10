@@ -28,7 +28,7 @@ def rotation_matrix(theta1, theta2, theta3):
 def first_motion_seq():
     return [5, 2, 0, 0, 0, 0, -25.7, -127.5, 0, 0, 0, 8, -25.7, -133.7, -7, 0, 0, 2.86487, -2.86487, 2.86487, -2.86487]
 
-def make_motionik(motion_seq, time, option, armid, armjntsgoal6):
+def make_motionik(motion_seq, time, option, armid, armjntsgoal6, open_width):
     """
     armid:0(right), 1(left)
     option:0(close), 1(open), 2(stay), 3(pause)
@@ -37,6 +37,8 @@ def make_motionik(motion_seq, time, option, armid, armjntsgoal6):
     motion_seq[0] = time
     motion_seq[1] = option
 
+    open_width = float(open_width)
+
     if option == 0 and armid == 0:
         motion_seq[17:19] = [0, 0]
     elif option == 0 and armid == 1:
@@ -44,7 +46,11 @@ def make_motionik(motion_seq, time, option, armid, armjntsgoal6):
     elif option == 1 and armid == 0:
         motion_seq[17:19] = [2.86487, -2.86487]
     elif option == 1 and armid == 1:
-         motion_seq[19:21] = [2.86487, -2.86487]
+        motion_seq[19:21] = [2.86487, -2.86487]
+    elif option == 2 and armid == 0:
+        motion_seq[17:19] = [open_width, -open_width]
+    elif option == 2 and armid == 1:
+        motion_seq[19:21] = [open_width, -open_width]
 
     if not armjntsgoal6 == []:
         if armid == 0:
@@ -92,28 +98,30 @@ def read_file(filepath):
                 option_num = 2
                 armid = 1
                 armjntsgoal6 = calculate_ik(line)
-                motion_seq = make_motionik(motion_seq, time, option_num, armid, armjntsgoal6)
+                open_width = line[9]
+                motion_seq = make_motionik(motion_seq, time, option_num, armid, armjntsgoal6, open_width)
             elif option == "LHAND_JNT_CLOSE":
                 option_num = 0
                 armid = 1
-                motion_seq = make_motionik(motion_seq, time, option_num, armid, armjntsgoal6)
+                motion_seq = make_motionik(motion_seq, time, option_num, armid, armjntsgoal6, 0)
             elif option == "LHAND_JNT_OPEN":
                 option_num = 1
                 armid = 1
-                motion_seq = make_motionik(motion_seq, time, option_num, armid, armjntsgoal6)
+                motion_seq = make_motionik(motion_seq, time, option_num, armid, armjntsgoal6, 0)
             elif option == "RARM_XYZ_ABS":
                 option_num = 2
                 armid = 0
                 armjntsgoal6 = calculate_ik(line)
-                motion_seq = make_motionik(motion_seq, time, option_num, armid, armjntsgoal6)
+                open_width = line[9]
+                motion_seq = make_motionik(motion_seq, time, option_num, armid, armjntsgoal6, open_width)
             elif option == "RHAND_JNT_CLOSE":
                 option_num = 0
                 armid = 0
-                motion_seq = make_motionik(motion_seq, time, option_num, armid, armjntsgoal6)
+                motion_seq = make_motionik(motion_seq, time, option_num, armid, armjntsgoal6, 0)
             elif option == "RHAND_JNT_OPEN":
                 option_num = 1
                 armid = 0
-                motion_seq = make_motionik(motion_seq, time, option_num, armid, armjntsgoal6)
+                motion_seq = make_motionik(motion_seq, time, option_num, armid, armjntsgoal6, 0)
             else:
                 raise ValueError("Motion Option Error!")
             motion_seq_list.append(list(motion_seq))

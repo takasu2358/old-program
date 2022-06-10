@@ -31,8 +31,17 @@ os.mkdir("/home/takasu/ダウンロード/wire-test/result/Experiment/{}".format
 args = sys.argv
 full_length = int(args[1])
 
+filepath = "/home/takasu/ダウンロード/wire-test/ply/out.ply"
+img, matrix_image, pcd_matrix, max_depth = ply2depth_csv.main(filepath)
+cv2.imwrite('/home/takasu/ダウンロード/wire-test/result/Experiment/{}/depthimg.png'.format(foldername), img)
+height, width = img.shape #画像サイズの取得
+img_copy = img.copy() #画像のコピー
+
 #閾値集
-extend_condition = 3     #compare_luminosity関数内
+if max_depth > 75:
+    extend_condition = 3     #compare_luminosity関数内
+else:
+    extend_condition = 4
 large_area_threshold = 30  #search_seed関数内
 small_area_threshold = 100   #search_seed関数内
 skel_length_threshold = 10  #detect_line関数内
@@ -40,12 +49,8 @@ small_area_threshold2 = 150 #small_region関数内
 blocksize = 25              #valley_enhance関数内
 line_length_threshold = 40  #valley_enhance関数内
 cut_threshold = 50          #cutting, ad_cutting関数内 
-
-filepath = "/home/takasu/ダウンロード/wire-test/ply/out.ply"
-img, matrix_image, pcd_matrix = ply2depth_csv.main(filepath)
-cv2.imwrite('/home/takasu/ダウンロード/wire-test/result/Experiment/{}/depthimg.png'.format(foldername), img)
-height, width = img.shape #画像サイズの取得
-img_copy = img.copy() #画像のコピー
+OPEN_WIDTH = 50
+max_open_width = 2.86487
 
 def get_neighbor(poi, gray_img):
     neighbor = []
@@ -190,13 +195,15 @@ class SaveImage():
     def save_grasp_position(self, LC_skel_list, obj_index, optimal_grasp):
         depth = img_copy.copy()
         depth = gray2color(depth)
-        alpha = 30
         skel = LC_skel_list[obj_index]
         for i in range(0, len(skel), 15):
             depth = cv2.circle(depth, (int(skel[i][1]), int(skel[i][0])), 4, (0, 255, 0), -1)
         grasp = optimal_grasp[0]
         grasp_point = grasp[3]
         theta = -(grasp[1] + 90)
+        alpha = 30
+        open_width = grasp[4]
+        alpha -= open_width*5
         grasp_line_vector = np.array([int(alpha*math.cos(math.radians(theta))), int(-alpha*math.sin(math.radians(theta)))])
         circle_point1 = grasp_point + grasp_line_vector
         circle_point2 = grasp_point - grasp_line_vector
@@ -2788,20 +2795,11 @@ class Graspability():
 
     def __init__(self):
         self.TEMPLATE_SIZE = 100
-        self.HAND_WIDTH = 10
-        self.HAND_THICKNESS_X = 2
-        self.HAND_THICKNESS_Y = 5
-        self.BEFORE_TO_AFTER = 500/100
+        self.OPEN_WIDTH = OPEN_WIDTH
+        self.HAND_THICKNESS_X = 10
+        self.HAND_THICKNESS_Y = 25
         self.cutsize = self.TEMPLATE_SIZE/2
-        self.margin = 50
-        self.GaussianKernelSize = 75
-        self.GaussianSigma = 25
-        self.InitialHandDepth = 0
-        self.FinalHandDepth = 201
-        self.HandDepthStep = 25
-        self.GripperD = 15
         self.interval = 15
-        self.error_width = 50
 
     def __main__(self, objs_GLI, LC_skel_list, LC_region_list, interpolate, GLI_matrix, z_list, region_list2):
         GLI = GaussLinkingIintegral()
@@ -2843,15 +2841,15 @@ class Graspability():
             return optimal_grasp, [], 0
 
     def make_template(self):
-        L1x = int((self.TEMPLATE_SIZE / 2) - (((self.HAND_WIDTH / 2) + self.HAND_THICKNESS_X) * self.BEFORE_TO_AFTER))
-        L3x = int((self.TEMPLATE_SIZE / 2) - (((self.HAND_WIDTH / 2) + 0) * self.BEFORE_TO_AFTER))
-        R1x = int((self.TEMPLATE_SIZE / 2) + (((self.HAND_WIDTH / 2) + 0) * self.BEFORE_TO_AFTER))
-        R3x = int((self.TEMPLATE_SIZE / 2) + (((self.HAND_WIDTH / 2) + self.HAND_THICKNESS_X) * self.BEFORE_TO_AFTER))
+        L1x = int((self.TEMPLATE_SIZE / 2) - (self.OPEN_WIDTH / 2 + self.HAND_THICKNESS_X))
+        L3x = int((self.TEMPLATE_SIZE / 2) - (self.OPEN_WIDTH / 2))
+        R1x = int((self.TEMPLATE_SIZE / 2) + (self.OPEN_WIDTH / 2))
+        R3x = int((self.TEMPLATE_SIZE / 2) + (self.OPEN_WIDTH / 2 + self.HAND_THICKNESS_X))
 
-        L1y = int((self.TEMPLATE_SIZE / 2) - ((self.HAND_THICKNESS_Y / 2) * self.BEFORE_TO_AFTER))
-        L3y = int((self.TEMPLATE_SIZE / 2) + ((self.HAND_THICKNESS_Y / 2) * self.BEFORE_TO_AFTER))
-        R1y = int((self.TEMPLATE_SIZE / 2) - ((self.HAND_THICKNESS_Y / 2) * self.BEFORE_TO_AFTER))
-        R3y = int((self.TEMPLATE_SIZE / 2) + ((self.HAND_THICKNESS_Y / 2) * self.BEFORE_TO_AFTER))
+        L1y = int((self.TEMPLATE_SIZE / 2) - (self.HAND_THICKNESS_Y / 2))
+        L3y = int((self.TEMPLATE_SIZE / 2) + (self.HAND_THICKNESS_Y / 2))
+        R1y = int((self.TEMPLATE_SIZE / 2) - (self.HAND_THICKNESS_Y / 2))
+        R3y = int((self.TEMPLATE_SIZE / 2) + (self.HAND_THICKNESS_Y / 2))
  
         Hc_original = np.zeros((self.TEMPLATE_SIZE, self.TEMPLATE_SIZE))
         cv2.rectangle(Hc_original, (L1x, L1y), (L3x, L3y), (255, 255, 255), -1)
@@ -2859,7 +2857,7 @@ class Graspability():
 
         Hc_original_list = []
 
-        for i in range(3):
+        for i in range(4):
             Hc_original = np.zeros((self.TEMPLATE_SIZE, self.TEMPLATE_SIZE))
             cv2.rectangle(Hc_original, (L1x+5*i, L1y), (L3x+5*i, L3y), (255, 255, 255), -1)
             cv2.rectangle(Hc_original, (R1x-5*i, R1y), (R3x-5*i, R3y), (255, 255, 255), -1)
@@ -2881,12 +2879,12 @@ class Graspability():
 
     #把持位置決定
     def find_grasp_point(self, skel_list, obj_index, interpolate, cross_matrix, region_list, LC_region_list, all_region):
-        grasp_obj = skel_list[obj_index]                                            #obj_indexは把持対象物の番号
-        grasp_region_index = LC_region_list[obj_index]
-        length = len(grasp_obj)                                                     #grasp_objの画素数
-        obj_interpolate = interpolate[obj_index]                                    #grasp_objの補間部分
-        optimal_grasp = []                    #最適な５つの把持位置がoptimal_graspに保存される
-        Hc_original_list = self.make_template()                             #グリッパーのテンプレート
+        grasp_obj = skel_list[obj_index]                 #obj_indexは把持対象物の番号
+        grasp_region_index = LC_region_list[obj_index]   #把持対象物のregion_listでのindex
+        length = len(grasp_obj)                          #grasp_objの画素数
+        obj_interpolate = interpolate[obj_index]         #grasp_objの補間部分
+        optimal_grasp = []                               #最適な５つの把持位置がoptimal_graspに保存される
+        Hc_original_list = self.make_template()          #グリッパーのテンプレート
 
         ##############把持対象物が他の物体の下側に存在する場合、その交点を見つける#######################
         underlapped_point = []
@@ -2924,14 +2922,11 @@ class Graspability():
             contact_image = MI.make_image(region_list[grasp_region_index], 1)
         ################################################################################################
 
-        # if not type(grasp_region_index) is list:
-        #     grasp_region_index = [grasp_region_index]
-
         depth = img_copy.copy()
         depth[all_region==0] *= 0
-        contact_depth = depth.copy()
+        # contact_depth = depth.copy()
         # contact_depth = depth * contact_image    #把持対象物のみの深度画像
-        depth[contact_image>0] = 0               #把持対象物の無い深度画像
+        # depth[contact_image>0] = 0               #把持対象物の無い深度画像
 
         ########################対象物に沿って一定間隔で把持位置を求める####################################
         if start_index == 0:
@@ -2948,15 +2943,8 @@ class Graspability():
             if poi in obj_interpolate:
                 continue
             next_poi = grasp_obj[i+self.interval]
-            z = contact_depth[poi[0]][poi[1]]
-            optimal_grasp = self.graspability(poi, next_poi, prev_poi, optimal_grasp, Hc_original_list, depth, z, i//self.interval)
-
-            # _, Wc = cv2.threshold(depth,z,255,cv2.THRESH_BINARY)
-            # contact_image2 = gray2color(contact_image)
-            # contact_image2[poi[0]-1:poi[0]+1, poi[1]-1:poi[1]+1] = [255, 0, 0]
-            # print(z)
-            # V.visualize_3img(img_copy, contact_image2, Wc)
-
+            z = depth[poi[0]][poi[1]]
+            optimal_grasp = self.graspability(poi, next_poi, prev_poi, optimal_grasp, Hc_original_list, depth, z, i//self.interval, contact_image)
             prev_poi = poi
             # depth = cv2.circle(depth, (poi[1], poi[0]), 1, (255, 0, 0), -1)
         ####################################################################################################
@@ -3005,8 +2993,8 @@ class Graspability():
 
         depth = img_copy.copy()
         depth[all_region==0] *= 0
-        depth[contact_image>0] = 0
-        contact_depth = depth * contact_image
+        # depth[contact_image>0] = 0
+        # contact_depth = depth * contact_image
 
         prev_poi = [-1, -1]
         for i in range(overlapped_point_index - self.interval*2, overlapped_point_index + self.interval*2 + 1, self.interval):
@@ -3014,22 +3002,30 @@ class Graspability():
                 continue
             poi = grasp_obj[i]
             next_poi = grasp_obj[i+self.interval]
-            z = contact_depth[poi[0]][poi[1]]+30
-            optimal_grasp = self.graspability(poi, next_poi, prev_poi, optimal_grasp, Hc_original_list, depth, z, i//self.interval)
+            z = depth[poi[0]][poi[1]]
+            optimal_grasp = self.graspability(poi, next_poi, prev_poi, optimal_grasp, Hc_original_list, depth, z, i//self.interval, contact_image)
             prev_poi = poi
             # depth = cv2.circle(depth, (poi[1], poi[0]), 1, (255, 0, 0), -1)
 
         return optimal_grasp
 
-    def graspability(self, poi, next_poi, prev_poi, optimal_grasp, Hc_original_list, depth, z, index):
+    def graspability(self, poi, next_poi, prev_poi, optimal_grasp, Hc_original_list, depth, z, index, contact_image):
+        ###########################################################
+        '''
+        optimal_grasp(grasp)の構成
+        grasp[0]:点の番号
+        grasp[1]:方向
+        grasp[2]:z座標
+        grasp[3]:xy座標
+        grasp[4]:グリッパの開き幅
+        '''
+        ###########################################################
         if z == 0:
-            raise ValueError("3028行目、把持点が不適当です。")        
-        z -= 30
+            return optimal_grasp
+
+        z -= int(15*(100/max_depth))
         if z < 0:
             z = 0
-
-        depth = min_max_x(depth)
-        depth *= 255
 
         Hc_rotate_list = []
         vector2next = np.array([next_poi[0], next_poi[1]]) - np.array([poi[0], poi[1]])
@@ -3041,24 +3037,63 @@ class Graspability():
             initial_rotate = math.degrees(math.atan2(vector2next[1], vector2next[0]))
             Hc_rotate_list.append(Hc_original.rotate(initial_rotate))
 
+        contact_Image = Image.fromarray(contact_image)
+        collision_per_angle = []
+        '''
+        collision_per_angleはangleごとに各開き幅での衝突判定をする。
+        -1ならすべての開き幅で衝突なし
+        0ならすべての開き幅で衝突
+        :
+        3なら最小開き幅でのみ衝突
+        '''       
+        for angle in np.arange(-22.5, 33.75, 22.5):
+            collision_per_angle.append(100)
+            for i, Hc_rotate in enumerate(Hc_rotate_list):
+                Hc_rotate = Hc_rotate.rotate(angle)
+                Hc_rotate = np.array(Hc_rotate)
+                CI_crop = np.array(contact_Image.crop((poi[1]-self.cutsize, poi[0]-self.cutsize, poi[1]+self.cutsize, poi[0]+self.cutsize)))
+                # CI_crop_color = gray2color(CI_crop)
+                # CI_crop_color[Hc_rotate > 0] = [255, 0, 0]
+                CI_crop[Hc_rotate == 0] = 0
+                if np.sum(CI_crop) > 0:
+                    # V.visualize_1img(CI_crop_color)
+                    collision_per_angle[-1] = i
+                    break
+
         num_template = len(Hc_rotate_list)
         _, Wc = cv2.threshold(depth,z,255,cv2.THRESH_BINARY)
         Wc = self.cv2pil(Wc)
-        Wc = Wc.crop((poi[1]-self.cutsize, poi[0]-self.cutsize, poi[1]+self.cutsize, poi[0]+self.cutsize))
-        for angle in np.arange(-22.5, 33.75, 22.5):
+        Wc_crop = Wc.crop((poi[1]-self.cutsize, poi[0]-self.cutsize, poi[1]+self.cutsize, poi[0]+self.cutsize))
+        for i, angle in enumerate(np.arange(-22.5, 33.75, 22.5)):
+            collision_check = collision_per_angle[i] 
+            if collision_check == 0:
+                continue
             count = 0
-            for Hc_rotate in Hc_rotate_list:
+            for j, Hc_rotate in enumerate(Hc_rotate_list):
+                if collision_check <= j:
+                    continue
                 Hc_rotate = Hc_rotate.rotate(angle)
-                C = np.array(Wc) * np.array(Hc_rotate)
+                C = np.array(Wc_crop) * np.array(Hc_rotate)
                 C[C>0] = 1
+
+                # print(poi, z)
+                # Wc_color = gray2color(np.array(Wc))
+                # Wc_color = cv2.copyMakeBorder(Wc_color, 50, 50, 50, 50, cv2.BORDER_CONSTANT, value=(0, 0, 0))
+                # Wc_color[poi[0]:poi[0]+100, poi[1]:poi[1]+100][np.array(Hc_rotate) > 0] = [255, 0, 0]
+                # Wc_color = Wc_color[50:Wc.height+50, 50:Wc.width+50]
+                # Wc_color[contact_image > 0] = [0, 255, 0]
+                # Wc_color = cv2.circle(Wc_color, (poi[1], poi[0]), 3, [0, 0, 255], -1)
+                # V.visualize_3img(Wc_color, depth, C)
+
                 if np.sum(C) <= 10:
                     count += 1
-            if count == num_template:
+            if count == collision_check:        
                 grasp = []
                 grasp.append(index)
                 grasp.append(initial_rotate+angle)
                 grasp.append(z)
                 grasp.append(poi)
+                grasp.append(0)
                 optimal_grasp.append(grasp)
         
         return optimal_grasp
@@ -3098,17 +3133,6 @@ def make_motionfile(optimal_grasp, goal_potion):
     obj_y = grasp_point[1]
     obj_z = grasp_point[2]-0.13
     print("grasp_point = ", grasp_point)
-
-    # print(best_grasp)
-    # obj_x = 0.33 + best_grasp[3][0]/330*0.37
-    # obj_y = -0.18 + (best_grasp[3][1]-70)/420*0.47 - 0.02 + (height - best_grasp[3][1])*0.00007
-
-    # obj_x = 0.34 + best_grasp[3][0]/330*0.34
-    # obj_y = -0.17 + best_grasp[3][1]/420*0.47
-    # obj_z = -((1200-best_grasp[2]*40/255)*1118/1200-(1118-115))/1000 + 0.12
-
-    # print("best_z = ", best_grasp[2] )
-    # print("obj_z = ", obj_z)
         
     obj_orientation = best_grasp[1]
     if obj_orientation > 90:
@@ -3118,30 +3142,33 @@ def make_motionfile(optimal_grasp, goal_potion):
     obj_roll, obj_pitch, obj_yaw = 0, 0, round(obj_orientation, 1)
     print("grasp_orientation = ", (obj_roll, obj_pitch, obj_yaw))
 
+    open_width = (OPEN_WIDTH-best_grasp[4]*10) / OPEN_WIDTH * max_open_width
+    print("open_width = ", open_width)
+
     goal_x = goal_potion[0]
     goal_y = goal_potion[1]
     goal_z = goal_potion[2]
 
     upper_z = 0.2
 
-    motion_list.append([time, time+3, "LHAND_JNT_OPEN"]) #ハンドを開く
+    # motion_list.append([time, time+3, "LHAND_JNT_OPEN"]) #ハンドを開く
+    # time += time_interval
+    motion_list.append([time, time+time_interval, "LARM_XYZ_ABS", obj_x, obj_y, upper_z, obj_roll, obj_pitch, obj_yaw, open_width]) #対象物の上に移動
     time += time_interval
-    motion_list.append([time, time+time_interval, "LARM_XYZ_ABS", obj_x, obj_y, upper_z, obj_roll, obj_pitch, obj_yaw]) #対象物の上に移動
-    time += time_interval
-    motion_list.append([time, time+time_interval+7, "LARM_XYZ_ABS", obj_x, obj_y, obj_z, obj_roll, obj_pitch, obj_yaw]) #対象物の高さに下ろす
+    motion_list.append([time, time+time_interval+7, "LARM_XYZ_ABS", obj_x, obj_y, obj_z, obj_roll, obj_pitch, obj_yaw, open_width]) #対象物の高さに下ろす
     time += time_interval
     time += 7
     motion_list.append([time, time+time_interval, "LHAND_JNT_CLOSE"]) #ハンドを閉じる
     time += time_interval
-    motion_list.append([time, time+time_interval, "LARM_XYZ_ABS", obj_x, obj_y, upper_z, obj_roll, obj_pitch, obj_yaw]) #対象物を真上へ持ち上げ
+    motion_list.append([time, time+time_interval, "LARM_XYZ_ABS", obj_x, obj_y, upper_z, obj_roll, obj_pitch, obj_yaw, 0]) #対象物を真上へ持ち上げ
     time += time_interval
-    motion_list.append([time, time+time_interval, "LARM_XYZ_ABS", goal_x, goal_y, upper_z, 0, 0, 0]) #対象物を置く地点の上に移動
+    motion_list.append([time, time+time_interval, "LARM_XYZ_ABS", goal_x, goal_y, upper_z, 0, 0, 0, 0]) #対象物を置く地点の上に移動
     time += time_interval
-    motion_list.append([time, time+time_interval, "LARM_XYZ_ABS", goal_x, goal_y, goal_z, 0, 0, 0]) #対象物を下ろす
+    motion_list.append([time, time+time_interval, "LARM_XYZ_ABS", goal_x, goal_y, goal_z, 0, 0, 0, 0]) #対象物を下ろす
     time += time_interval
     motion_list.append([time, time+time_interval, "LHAND_JNT_OPEN"]) #ハンドを開く
     time += time_interval
-    motion_list.append([time, time+time_interval, "LARM_XYZ_ABS", goal_x, goal_y, upper_z, 0, 0, 0]) #ハンドを上げる
+    motion_list.append([time, time+time_interval, "LARM_XYZ_ABS", goal_x, goal_y, upper_z, 0, 0, 0, 2.86487]) #ハンドを上げる
     time += time_interval
 
     with open("/home/takasu/ダウンロード/wire-test/motionfile/motionfile.dat", "w") as f:

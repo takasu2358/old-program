@@ -27,6 +27,10 @@ def pointcloud_process(pcd_matrix, flat):
     depth, matrix_image = xyz2matrix(pcd_matrix2)
     depth = depth - flat
     depth[depth<3] = 0
+    depth[0:10] = 0
+    depth[:, 400:420] = 0
+    depth[:, 0:10] = 0
+    depth[depth>200] = 0
 
     return depth, matrix_image, pcd_matrix3
 
@@ -35,7 +39,7 @@ def PtoD(depth):
     if MAX_DEPTH > 100:
         MAX_DEPTH = 100
     MIN_DEPTH = 0
-    MAX_DEPTH = 100
+    # MAX_DEPTH = 100
 
     for i, row in enumerate(depth):
         for j, z in enumerate(row):
@@ -44,7 +48,7 @@ def PtoD(depth):
             elif z > MAX_DEPTH:
                 depth[i][j] = 255
     
-    return depth
+    return depth, MAX_DEPTH
 
 def xyz2matrix(matrix):
     depth = np.zeros((WINDOW_HEIGHT*num, WINDOW_WIDTH*num))
@@ -80,7 +84,7 @@ def main(filepath):
 
     depth, matrix_image, matrix = pointcloud_process(pcd_matrix, flat_list)
 
-    depth = PtoD(depth)
+    depth, MAX_DEPTH = PtoD(depth)
     depth[depth < 0] = 0
 
     # from PIL import Image
@@ -94,7 +98,7 @@ def main(filepath):
     print("Converting ply to depth image is succeeded!")
     print("Run time costs is {}".format(elapsed_time))
 
-    return depth, matrix_image, matrix
+    return depth, matrix_image, matrix, MAX_DEPTH
 
 if __name__ == "__main__":
     start = time.time()
@@ -105,7 +109,7 @@ if __name__ == "__main__":
     # ptCloud = o3d.io.read_point_cloud(filepath)
     # o3d.visualization.draw_geometries([ptCloud])
   
-    depth, _, _ = main(filepath)
+    depth, _, _, _ = main(filepath)
 
     # df  = pd.DataFrame(depth)
     # df.to_csv('./result/depth_result.csv')
